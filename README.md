@@ -132,8 +132,6 @@ All data is synthetic. No client names, project or tape codes, hostnames or inte
 
 ## AI assistance
 
-> **DRAFT. Georgi to confirm or correct before publishing.**
-
 The code and workflow in this repository were built with an AI coding assistant (Claude, by Anthropic). I did not write the Python or JavaScript by hand.
 
 What I did:
