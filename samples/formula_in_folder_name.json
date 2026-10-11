@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "sent_at": "2026-10-11T18:32:05+01:00",
+  "tree": "=HYPERLINK(\"http://example.com\",\"click\")",
+  "error_message": null,
+  "tool_version": "0.1.0",
+  "status": "CLEAN",
+  "exit_code": 0,
+  "report_path": "D:/DeliveryReports/report-2026-10-11_183209",
+  "counts": {
+    "ERROR": 0,
+    "WARNING": 0,
+    "INFO": 0
+  },
+  "top_causes": []
+}

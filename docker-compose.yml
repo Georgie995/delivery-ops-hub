@@ -1,0 +1,26 @@
+# Runs n8n for delivery-ops-hub. Start: docker compose up -d   Stop: docker compose down
+# First time only: create the shared folders n8n writes to (it will not create them itself):
+#   mkdir -p runtime/logs runtime/dry-run-alerts
+# Reviewed and approved by Georgi before first use.
+
+services:
+  n8n:
+    # Official n8n image, pinned to one version so every run is the same.
+    image: n8nio/n8n:2.42.6
+    container_name: delivery-ops-hub-n8n
+    restart: "no"                      # only runs when you start it
+    ports:
+      - "127.0.0.1:5678:5678"          # reachable from this PC only, not the network
+    environment:
+      - TZ=Europe/London               # log times match your clock
+      - GENERIC_TIMEZONE=Europe/London
+      - N8N_RESTRICT_FILE_ACCESS_TO=/files        # n8n may only read/write the shared folder
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_DIAGNOSTICS_ENABLED=false             # don't send usage statistics
+      - N8N_PERSONALIZATION_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n       # n8n's private storage: workflows, credentials
+      - ./runtime:/files               # shared folder: CSV log and dry-run alerts (git-ignored)
+
+volumes:
+  n8n_data:

@@ -1,0 +1,384 @@
+{
+  "id": "deliveryOpsHub01",
+  "name": "delivery-ops-hub",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Delivery check received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "delivery-check",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "5f6f2b1e-6a43-4c7e-9a0b-0d8e1c2a7b10"
+    },
+    {
+      "id": "a2",
+      "name": "Validate and prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// n8n Code node \"Validate and prepare\" (mode: run once for all items).\n// Checks the message from the sender, then prepares the CSV log line and, if needed,\n// the Teams message. Everything in the payload is data: it is displayed, never acted on.\n\n// ---- Settings (edit here) -------------------------------------------------------\nconst SETTINGS = {\n  // 'dry_run': alerts are saved as files in /files/dry-run-alerts (runtime/dry-run-alerts on your PC).\n  // 'live':    alerts are posted to Teams (added in module 3).\n  teams_mode: 'dry_run',\n};\n// ---------------------------------------------------------------------------------\n\nconst STATUSES = ['CLEAN', 'PASSED_WITH_WARNINGS', 'PROBLEMS_FOUND', 'NOT_CHECKED'];\nconst CSV_HEADER = 'received_at,event_id,status,exit_code,tree,errors,warnings,info,top_cause,report_path,alert';\n\nconst p = $input.first().json.body || {};\n\n// Same rules as the sender's validate() in delivery_ops_hub/payload.py.\nconst problems = [];\nif (p.schema_version !== 1) problems.push('schema_version must be 1');\nif (typeof p.event_id !== 'string' || !p.event_id) problems.push('event_id is missing');\n// The event ID becomes part of a file name, so only safe characters are allowed.\nelse if (!/^[A-Za-z0-9_-]{1,64}$/.test(p.event_id)) problems.push('event_id may only contain letters, digits, - and _');\nif (!STATUSES.includes(p.status)) problems.push('status must be one of ' + STATUSES.join(', '));\nfor (const key of ['sent_at', 'tree']) if (!p[key]) problems.push(key + ' is missing');\nif (p.status === 'NOT_CHECKED') {\n  if (!p.error_message) problems.push('error_message is required for NOT_CHECKED');\n} else if (STATUSES.includes(p.status)) {\n  if (!p.counts || typeof p.counts !== 'object') problems.push('counts is missing');\n  if (!p.report_path) problems.push('report_path is missing');\n}\nif (p.top_causes !== undefined && !Array.isArray(p.top_causes)) problems.push('top_causes must be a list');\nif (problems.length) return [{ json: { valid: false, problems } }];\n\nconst needsAlert = p.status === 'PROBLEMS_FOUND' || p.status === 'NOT_CHECKED';\nconst counts = p.counts || {};\nconst causes = Array.isArray(p.top_causes) ? p.top_causes : [];\n\n// One CSV cell. A value starting with = + - @ could run as a formula when the log is\n// opened in Excel (\"CSV injection\"), so it gets a leading apostrophe and stays plain text.\nfunction cell(value) {\n  let text = value === null || value === undefined ? '' : String(value);\n  if (/^[=+\\-@\\t\\r]/.test(text)) text = \"'\" + text;\n  return /[\",\\r\\n]/.test(text) ? '\"' + text.replace(/\"/g, '\"\"') + '\"' : text;\n}\n\nconst receivedAt = DateTime.now().setZone('Europe/London').toISO({ suppressMilliseconds: true });\nconst csvLine = [receivedAt, p.event_id, p.status, p.exit_code, p.tree, counts.ERROR, counts.WARNING,\n  counts.INFO, causes.length ? causes[0].code : '', p.report_path, needsAlert ? SETTINGS.teams_mode : 'none']\n  .map(cell).join(',');\n\n// Teams message: an Adaptive Card, in the shape a Teams Workflows webhook accepts.\nlet teamsMessage = null;\nif (needsAlert) {\n  const notChecked = p.status === 'NOT_CHECKED';\n  const facts = [{ title: 'Folder', value: String(p.tree) }];\n  if (notChecked) {\n    facts.push({ title: 'Reason', value: String(p.error_message) });\n  } else {\n    facts.push({ title: 'Errors / warnings / info',\n                 value: `${counts.ERROR ?? 0} / ${counts.WARNING ?? 0} / ${counts.INFO ?? 0}` });\n    facts.push({ title: 'Full report', value: String(p.report_path) });\n  }\n  facts.push({ title: 'Checked at', value: String(p.sent_at) }, { title: 'Event ID', value: p.event_id });\n\n  const body = [\n    { type: 'TextBlock', size: 'Large', weight: 'Bolder', color: 'Attention', wrap: true,\n      text: notChecked ? 'NOT CHECKED: nothing was verified' : 'PROBLEMS FOUND in a delivery check' },\n    { type: 'FactSet', facts },\n  ];\n  if (causes.length) {\n    body.push({ type: 'TextBlock', weight: 'Bolder', wrap: true, text: 'Probable causes (not verdicts)' });\n    for (const c of causes.slice(0, 3)) {\n      const n = Number(c.file_count) || 0;\n      body.push({ type: 'TextBlock', wrap: true,\n                  text: `${c.severity}: ${c.summary} (${n} file${n === 1 ? '' : 's'})` });\n    }\n  }\n  teamsMessage = {\n    type: 'message',\n    attachments: [{\n      contentType: 'application/vnd.microsoft.card.adaptive',\n      contentUrl: null,\n      content: { $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',\n                 type: 'AdaptiveCard', version: '1.4', body },\n    }],\n  };\n}\n\nreturn [{ json: {\n  valid: true,\n  event_id: p.event_id,\n  status: p.status,\n  needs_alert: needsAlert,\n  alert_mode: needsAlert ? SETTINGS.teams_mode : 'none',\n  csv_header: CSV_HEADER,\n  csv_line: csvLine,\n  teams_message: teamsMessage,\n} }];\n"
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a3-c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Reply: invalid (400)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        520
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'invalid payload', problems: $json.problems } }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Read existing log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/files/logs/delivery-checks.csv",
+        "options": {}
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a6",
+      "name": "Make log line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// n8n Code node \"Make log line\" (mode: run once for all items).\n// Runs after \"Read existing log\". If no log file exists yet, it starts one with the\n// Excel marker (UTF-8 byte order mark) and a header row. The line is then appended.\n\nconst prep = $('Validate and prepare').first().json;\nconst previous = $input.first();\nconst logExists = Boolean(previous.binary && Object.keys(previous.binary).length);\n\nconst text = (logExists ? '' : '﻿' + prep.csv_header + '\\r\\n') + prep.csv_line + '\\r\\n';\n\nreturn [{\n  json: {},\n  binary: {\n    data: {\n      data: Buffer.from(text, 'utf8').toString('base64'),\n      mimeType: 'text/csv',\n      fileName: 'delivery-checks.csv',\n    },\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "a7",
+      "name": "Append to log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "/files/logs/delivery-checks.csv",
+        "dataPropertyName": "data",
+        "options": {
+          "append": true
+        }
+      }
+    },
+    {
+      "id": "a8",
+      "name": "Needs alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a8-c1",
+              "leftValue": "={{ $('Validate and prepare').first().json.needs_alert }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a9",
+      "name": "Reply: logged, no alert",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        360
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { logged: true, alerted: false, alert_mode: 'none', event_id: $('Validate and prepare').first().json.event_id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a10",
+      "name": "Make dry-run alert file",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// n8n Code node \"Make dry-run alert file\" (mode: run once for all items).\n// Dry-run mode: the Teams message is saved exactly as it would be posted.\n\nconst prep = $('Validate and prepare').first().json;\nconst text = JSON.stringify(prep.teams_message, null, 2);\nconst fileName = `teams-${prep.event_id}.json`;  // event_id was checked to be safe characters only\n\nreturn [{\n  json: { path: `/files/dry-run-alerts/${fileName}` },\n  binary: {\n    data: {\n      data: Buffer.from(text, 'utf8').toString('base64'),\n      mimeType: 'application/json',\n      fileName,\n    },\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "a11",
+      "name": "Save dry-run alert",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        100
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.path }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "a12",
+      "name": "Reply: logged and alerted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { logged: true, alerted: true, alert_mode: 'dry_run', event_id: $('Validate and prepare').first().json.event_id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a13",
+      "name": "Reply: logged, alert failed (502)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { logged: true, alerted: false, alert_mode: 'dry_run', error: 'could not save the dry-run alert: ' + ($json.error?.message ?? 'unknown error'), event_id: $('Validate and prepare').first().json.event_id } }}",
+        "options": {
+          "responseCode": 502
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Delivery check received": {
+      "main": [
+        [
+          {
+            "node": "Validate and prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and prepare": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read existing log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: invalid (400)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read existing log": {
+      "main": [
+        [
+          {
+            "node": "Make log line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make log line": {
+      "main": [
+        [
+          {
+            "node": "Append to log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to log": {
+      "main": [
+        [
+          {
+            "node": "Needs alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs alert?": {
+      "main": [
+        [
+          {
+            "node": "Make dry-run alert file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: logged, no alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make dry-run alert file": {
+      "main": [
+        [
+          {
+            "node": "Save dry-run alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save dry-run alert": {
+      "main": [
+        [
+          {
+            "node": "Reply: logged and alerted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: logged, alert failed (502)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}

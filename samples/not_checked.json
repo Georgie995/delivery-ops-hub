@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "sent_at": "2026-10-11T18:32:05+01:00",
+  "tree": "D:/Incoming/ShowA",
+  "error_message": "manifest-doctor: error: D:/Incoming/ShowA: does not exist",
+  "tool_version": "0.1.0",
+  "status": "NOT_CHECKED",
+  "exit_code": 2,
+  "report_path": null,
+  "counts": null,
+  "top_causes": []
+}

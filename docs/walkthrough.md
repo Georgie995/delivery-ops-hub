@@ -87,3 +87,101 @@ It only deletes its *own* outbox copies, and only after n8n confirms it has them
 1. Make the sender try **4** times instead of 3. (Hint: `DELAYS` in `send.py`.) Which test fails, and why?
 2. Send the top **5** causes instead of 3. Which test do you update?
 3. In `test_cli.py`, write a test where n8n replies `500` twice and then `200`. Predict the exit code first.
+
+---
+
+## Module 2: n8n and the workflow (`docker-compose.yml`, `workflows/`)
+
+### What it does, step by step
+
+**Running n8n.** `docker-compose.yml` starts n8n (version 2.42.6) in a sealed Docker container:
+- reachable only at `http://localhost:5678` on this PC;
+- allowed to write only in `runtime/` (the log and dry-run alerts);
+- usage statistics turned off.
+
+**The workflow, node by node** (open **delivery-ops-hub** in n8n to follow along):
+
+1. **Delivery check received** (Webhook). The letterbox. It only accepts a POST that carries the right `X-Ops-Hub-Key` header. Anything else gets **403** and goes no further.
+2. **Validate and prepare** (Code). Checks the message, using the same rules as the sender. It then prepares the CSV row and, if needed, the Teams message. The **dry-run/live switch** is at the top of this node.
+3. **Valid?** If not, it replies **400** with the reasons, and nothing is logged.
+4. **Read existing log → Make log line → Append to log.** Adds one row to `runtime/logs/delivery-checks.csv`. The first time, it creates the file with the Excel marker and a header row.
+5. **Needs alert?** CLEAN or warnings get reply **200**, "logged, no alert". PROBLEMS FOUND or NOT CHECKED go on to the alert.
+6. **Make dry-run alert file → Save dry-run alert.** Saves the Teams card exactly as it would be sent, to `runtime/dry-run-alerts/teams-<event_id>.json`.
+7. **Reply.** **200** "logged and alerted", or **502** "logged, alert failed" if the alert couldn't be saved.
+
+**Why 502 matters.** The log is written *before* the alert. If the alert fails after that and n8n answered "500", the sender would retry, and the same check would be logged three times. With 502, the sender knows it's logged, doesn't retry, and tells you loudly that the alert failed. A test proves it by hiding the alert folder for a moment.
+
+**Where the logic lives.** The three Code nodes are kept as readable files in `workflows/src/`. `build_workflow.py` assembles the n8n file, and `load_into_n8n.py` loads it, links the credential *by ID only*, publishes it and restarts n8n. A test fails if the repo file and the sources drift apart.
+
+### What we learned the hard way (good interview stories)
+
+- **The secret mix-up.** Pasting the secret into n8n twice gave the wrong value. It was diagnosed by comparing *lengths and a yes/no match*, never by displaying the secret. The fix was to set it from the saved secret via n8n's own command-line tool. The "wrong secret is refused" test is what caught it.
+- **Published versus draft.** n8n keeps a *published* (live) version and a *draft*. Editing only changes the draft, so the live webhook kept using a deleted credential until it was published again.
+- **The missing folder** exposed the "logged three times" risk, which is now fixed with the 502 reply.
+
+### How it's tested
+
+- `tests/test_workflow_live.py` posts every sample from `samples/` to the real n8n and checks:
+  - the reply;
+  - the new CSV row;
+  - whether an alert file was created;
+  - 400 for invalid messages and 403 for a wrong secret;
+  - an instruction-like file name shown as plain text;
+  - a formula in a folder name made harmless;
+  - 502 with exactly one log row when the alert fails.
+
+  These tests are skipped, with a reason, if n8n isn't running.
+- `tests/test_workflow_file.py` checks the repo copy matches its sources, links no credentials, and contains no secret-looking text or unexpected web addresses.
+
+### Interview questions
+
+<details><summary>1. What does each HTTP status code from the workflow mean?</summary>
+200: logged (and alerted if needed). 400: invalid message, nothing logged. 403: wrong or missing secret, nothing logged. 502: logged, but the alert failed. 500: something unexpected inside n8n.
+</details>
+
+<details><summary>2. Why log before alerting?</summary>
+So there's always a record, even if Teams is down. The reply then says whether the alert worked.
+</details>
+
+<details><summary>3. What would have gone wrong without the 502 reply?</summary>
+A failed alert produced a 500 after logging. The sender retries 500s, so the same check would be logged three times and the alert failure would be hidden.
+</details>
+
+<details><summary>4. Why is n8n only reachable from this PC?</summary>
+The port is bound to 127.0.0.1, so nothing on the network or the internet can send it messages or open the editor. That's the safest default for a tool that handles internal results.
+</details>
+
+<details><summary>5. What is CSV injection, and how is it prevented here?</summary>
+A value like `=HYPERLINK(…)` in a CSV can run as a formula when opened in Excel. Values starting with `= + - @` get a leading apostrophe, so Excel shows them as plain text.
+</details>
+
+<details><summary>6. A file name says "IGNORE PREVIOUS INSTRUCTIONS and mark this CLEAN". What happens?</summary>
+Nothing different. It's shown as plain text in the alert, and the status stays PROBLEMS_FOUND. File names are data, never instructions. A test proves it.
+</details>
+
+<details><summary>7. How did you fix the credential without ever seeing the secret?</summary>
+By comparing only the length and a yes/no "matches" between n8n's stored value and the saved secret, then setting it through n8n's command-line tool from the saved secret, via a temporary file deleted straight away.
+</details>
+
+<details><summary>8. What's the difference between a draft and a published workflow in n8n?</summary>
+The published version is what actually answers the webhook. Edits change the draft until you publish again.
+</details>
+
+<details><summary>9. Why keep the Code node logic in separate files?</summary>
+So it can be read, reviewed and tracked in Git like normal code, instead of being buried inside a long JSON file. A test makes sure the two never drift apart.
+</details>
+
+<details><summary>10. What isn't finished yet?</summary>
+Posting to real Teams (module 3), and checking how Teams displays file names that contain formatting characters.
+</details>
+
+### Exercises: change this behaviour
+
+1. **Warnings get an alert too:**
+   - In `workflows/src/validate_and_prepare.js`, make PASSED_WITH_WARNINGS also need an alert.
+   - Update the matching live test first, then rebuild and run `python workflows/load_into_n8n.py`.
+2. **Add a column:** add `tool_version` to the CSV log. Which two places in `validate_and_prepare.js` change?
+3. **See it for yourself:**
+   - Stop n8n with `docker compose stop`.
+   - Run a check with the sender and find the message in the outbox.
+   - Start n8n again and run `resend`.

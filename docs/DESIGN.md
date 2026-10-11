@@ -130,14 +130,16 @@ An alert that silently fails to send would repeat the F1 problem. So if every at
 
 | # | Node (plain English) | What it does |
 |---|---|---|
-| 1 | **Webhook**: "Delivery check received" | POST at `/webhook/delivery-check`. Header Auth credential checks `X-Ops-Hub-Key`; wrong or missing gets **403**. |
-| 2 | **Validate payload** | `schema_version` is 1, `status` is one of the four values, the required fields are present. Otherwise reply **400** with the reason. |
-| 3 | **Build log line** | Turns the payload into one CSV row (columns in section 6). |
-| 4 | **Append to log** | Read/Write Files node, *append* mode, writes to `/files/logs/delivery-checks.csv`. A header row is written if the file is new. |
-| 5 | **Needs an alert?** | Switch on `status`: CLEAN / PASSED_WITH_WARNINGS → step 8; PROBLEMS_FOUND / NOT_CHECKED → step 6. |
-| 6 | **Build Teams card** | Adaptive Card: result, folder, counts, up to 3 causes, report path. For NOT_CHECKED: "NOT CHECKED: nothing was verified" plus the reason. |
-| 7 | **Send or save card** | **Live:** HTTP POST to your Teams Workflows webhook. **Dry run:** save the card as `/files/outbox/teams-<event_id>.json`. If Teams fails, mark the alert as failed. |
-| 8 | **Reply to sender** | `200 {"logged": true, "alerted": true/false, "alert_mode": "live/dry_run/none"}`, or `502` if the Teams post failed (logged, but not alerted). |
+| 1 | **Delivery check received** (Webhook) | POST at `/webhook/delivery-check`. A Header Auth credential checks `X-Ops-Hub-Key`; a wrong or missing secret gets **403**. |
+| 2 | **Validate and prepare** (Code) | Applies the same rules as the sender's `validate()`, plus: `event_id` may only contain letters, digits, `-` and `_`, because it becomes part of a file name. Builds the CSV line and, if needed, the Teams message. The dry-run/live setting is at the top of this node. |
+| 3 | **Valid?** | No → **Reply: invalid (400)** with the list of problems. Nothing is logged. |
+| 4 | **Read existing log** | Only to find out whether the log file exists yet. If it doesn't, the next node starts it with the Excel marker and a header row. |
+| 5 | **Make log line** → **Append to log** | Appends one row to `/files/logs/delivery-checks.csv` (append mode). |
+| 6 | **Needs alert?** | CLEAN / PASSED_WITH_WARNINGS → **Reply: logged, no alert (200)**. PROBLEMS_FOUND / NOT_CHECKED → continue. |
+| 7 | **Make dry-run alert file** → **Save dry-run alert** | Saves the Teams message exactly as it would be posted, to `/files/dry-run-alerts/teams-<event_id>.json`. |
+| 8 | **Reply: logged and alerted (200)**, or **Reply: logged, alert failed (502)** | If saving or posting the alert fails, the check is already logged, so the reply is 502 and the sender reports it loudly *without* retrying (a retry would log it twice). |
+
+Live Teams posting is added in module 3.
 
 - **The exported workflow file contains no secrets.** n8n keeps credentials separately and doesn't include them in exports. Before each export, a check script searches the file for anything that looks like a URL token or key.
 - **The Teams webhook address contains its own secret** (a signature in the address). How to store it so it never appears in the export is **checked during the build**: n8n 2.0 blocks reading environment variables inside Code nodes by default, so the options need testing. The rule is fixed: it never appears in the repo.
@@ -147,9 +149,12 @@ An alert that silently fails to send would repeat the F1 problem. So if every at
 
 One row per message received:
 
-`received_at, event_id, status, exit_code, tree, errors, warnings, info, top_cause, report_path, alerted, alert_mode`
+`received_at, event_id, status, exit_code, tree, errors, warnings, info, top_cause, report_path, alert`
 
-- **UTF-8 with the Excel marker** (the same reason as manifest-doctor's CSV), if n8n's file node allows it. To be checked during the build; otherwise noted as a limit.
+The log is written *before* the alert, so `alert` records what was due: `none`, `dry_run` or `live`. Whether the alert then succeeded is in the reply to the sender (200 or 502).
+
+- **UTF-8 with the Excel marker** (the same reason as manifest-doctor's CSV), added when the log file is first created.
+- **Formulas can't run.** A value starting with `=`, `+`, `-` or `@` gets a leading apostrophe, so Excel shows it as text and never runs it as a formula ("CSV injection").
 - **Append-only.** The workflow never rewrites or deletes earlier rows.
 
 ## 7. Running n8n (Docker): shown and approved separately before anything runs

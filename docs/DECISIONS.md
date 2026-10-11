@@ -82,3 +82,19 @@ Each entry records the decision, the alternatives considered and why this one wa
 - **Rejected messages go to the outbox.** A message rejected by n8n (4xx, e.g. wrong secret) is saved there, so it isn't lost once the settings are fixed.
 - **No proxies:** the sender talks to n8n directly, so a system proxy never sees the secret.
 - **Slow tests on Windows:** the tests that simulate "n8n switched off" take about 2 seconds per attempt on Windows (the time Windows takes to report that nothing is listening). The total test run is under a minute.
+
+## 2026-10-11: n8n set-up and workflow (module 2)
+
+- **n8n 2.42.6 in Docker**, pinned to that version. Reachable only from this PC (`127.0.0.1:5678`). It may write only in `/files`, which is `runtime/` on the PC and git-ignored. Usage statistics are turned off.
+- **Logic kept in readable files.** The workflow's logic is in readable JavaScript files (`workflows/src/`), and `build_workflow.py` assembles the n8n file. A test fails if the two drift apart.
+- **Loading into n8n.** `load_into_n8n.py` uses n8n's own command-line tool to load the workflow, link the credential *by ID only*, publish it and restart n8n. The repo copy never links a credential.
+- **Credential set-up went wrong twice.** Pasting the secret in the browser twice produced the wrong value: first the header name went into the wrong box, then the value box received text that wasn't the secret. It was diagnosed by comparing lengths and a yes/no match, without ever displaying the secret. Georgi then approved setting it through n8n's command line from the secret saved for his Windows user, via a temporary file in `runtime/` that's deleted immediately. **Lesson:** the "wrong secret is refused" test caught a set-up mistake before any real use.
+- **Published versus draft.** n8n keeps separate *published* and *draft* versions. Editing a credential link in the editor changed only the draft, so the live webhook kept using a deleted credential (HTTP 500) until it was published again.
+- **Failed alert → 502.** A failed alert save previously produced "500 Error in workflow" *after* logging. The sender retries 500, so the same check would have been logged three times. Fixed so that alert failures reply **502 (logged, alert failed)**. A live test hides the alert folder to prove it.
+- **The log is written before the alert**, so its last column records what alert was *due* (`none`, `dry_run` or `live`). Whether it then succeeded is in the reply.
+- **Spreadsheet safety:** a value starting with `= + - @` gets a leading apostrophe in the CSV, so Excel can't run it as a formula.
+- **Safe event IDs:** `event_id` is limited to letters, digits, `-` and `_`, because it becomes part of a file name.
+- **The two runtime folders must exist** (`runtime/logs`, `runtime/dry-run-alerts`). n8n won't create folders. This is documented as a set-up step.
+- **Known limits:**
+  - the workflow reads the whole log file on every message, just to see whether it exists;
+  - Adaptive Card text supports a little formatting, so a file name containing `_` or `*` could appear partly in italics or bold in Teams (display only; to check in module 3).

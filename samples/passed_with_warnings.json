@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "sent_at": "2026-10-11T18:32:05+01:00",
+  "tree": "D:/Incoming/ShowA",
+  "error_message": null,
+  "tool_version": "0.1.0",
+  "status": "PASSED_WITH_WARNINGS",
+  "exit_code": 0,
+  "report_path": "D:/DeliveryReports/report-2026-10-11_183206",
+  "counts": {
+    "ERROR": 0,
+    "WARNING": 5,
+    "INFO": 1
+  },
+  "top_causes": [
+    {
+      "code": "CAUSE_WRAPPER_FOLDER",
+      "severity": "WARNING",
+      "summary": "5 files only match once the folder 'JobX_Delivery/' on disk is ignored.",
+      "file_count": 5
+    }
+  ]
+}
