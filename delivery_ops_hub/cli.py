@@ -78,9 +78,18 @@ def _deliver(payload, settings, secret):
         print(f"{status}: LOGGED, BUT TEAMS ALERT FAILED ({detail}). Tell the team directly.", file=sys.stderr)
         return NOT_DELIVERED
     path = outbox.save(settings["outbox_dir"], payload)
-    print(f"{status}: NOT DELIVERED to n8n ({result.error}). Saved to {path}. "
+    print(f"{status}: NOT DELIVERED to n8n ({_why(result)}). Saved to {path}. "
           "Run 'python -m delivery_ops_hub resend' once n8n is reachable.", file=sys.stderr)
     return NOT_DELIVERED
+
+
+def _why(result):
+    """The error, plus what it usually means when that isn't obvious."""
+    if result.status == 404:
+        # Seen in Georgi's hands-on run: resending straight after starting n8n.
+        return (f"{result.error}: n8n is still starting, or the workflow isn't published. "
+                "Wait 20 seconds and resend")
+    return result.error
 
 
 def _resend(settings, secret):
@@ -97,6 +106,6 @@ def _resend(settings, secret):
             outbox.remove_after_confirmed(path)
             sent += 1
         else:
-            print(f"Still not delivered: {path.name} ({result.error})", file=sys.stderr)
+            print(f"Still not delivered: {path.name} ({_why(result)})", file=sys.stderr)
     print(f"Resent {sent} of {len(waiting)} message(s).")
     return 0 if sent == len(waiting) else NOT_DELIVERED

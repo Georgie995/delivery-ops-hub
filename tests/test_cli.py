@@ -119,6 +119,19 @@ def test_resend_delivers_waiting_messages_and_removes_only_confirmed_ones(tmp_pa
     assert (folder / "notes.txt").exists()                          # never touches other files
 
 
+def test_404_explains_what_it_usually_means(tmp_path, fake_doctor, local_server, monkeypatch, capsys):
+    # Georgi's hands-on run: "n8n replied 404" right after starting n8n wasn't clear enough.
+    monkeypatch.setenv("OPS_HUB_WEBHOOK_SECRET", SECRET)
+    folder = tmp_path / "outbox"
+    folder.mkdir()
+    (folder / "evt-1.json").write_text(json.dumps({"schema_version": 1, "event_id": "evt-1"}), encoding="utf-8")
+    local_server.replies = [(404, {"message": "not registered"})]
+    assert run(tmp_path, fake_doctor, local_server.url, command="resend") == 3
+    err = capsys.readouterr().err
+    assert "n8n is still starting, or the workflow isn't published" in err
+    assert "wait 20 seconds and resend" in err.lower()
+
+
 def test_resend_with_empty_outbox_exits_0(tmp_path, fake_doctor, local_server, monkeypatch, capsys):
     monkeypatch.setenv("OPS_HUB_WEBHOOK_SECRET", SECRET)
     assert run(tmp_path, fake_doctor, local_server.url, command="resend") == 0
