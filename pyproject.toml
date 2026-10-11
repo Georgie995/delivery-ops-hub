@@ -1,0 +1,14 @@
+[project]
+name = "delivery-ops-hub"
+version = "0.1.0"
+description = "Sends manifest-doctor results to an n8n workflow that logs every check and alerts Teams on problems."
+requires-python = ">=3.11"
+dependencies = []  # standard library only, by design
+
+[project.optional-dependencies]
+dev = ["pytest"]  # used only to run the tests
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["live: needs a running n8n (skipped otherwise)"]

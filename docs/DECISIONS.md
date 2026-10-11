@@ -71,3 +71,14 @@ Each entry records the decision, the alternatives considered and why this one wa
 - **Outbox:** copies are deleted only after n8n confirms receipt.
 - **Error messages:** NOT_CHECKED messages are capped at 500 characters (configurable default).
 - **Teams address:** how to store the Teams webhook address is decided during the build. It must never appear in the repo.
+
+## 2026-10-11: Sender details (module 1)
+
+- **Tests use project 1's pytest.** They run with the pytest already installed for manifest-doctor (`../delivery-verify/.venv`), so nothing new was installed.
+- **manifest-doctor runs from its own folder** (via `PYTHONPATH`) as a separate program, without installing it. Its output is read as UTF-8, so accented file names survive.
+- **Exit code 1 isn't trusted on its own.** It only counts as "problems found" if a new report really exists. Python also exits with 1 when it can't find manifest-doctor at all, and that must become NOT_CHECKED, not a fake result.
+- **Secret checked first.** A missing secret stops the sender *before* the check runs, so a long check isn't wasted.
+- **"Logged but Teams failed" (HTTP 502 with `logged: true`)** is reported loudly. It isn't retried and isn't put in the outbox, because that would log the same check twice.
+- **Rejected messages go to the outbox.** A message rejected by n8n (4xx, e.g. wrong secret) is saved there, so it isn't lost once the settings are fixed.
+- **No proxies:** the sender talks to n8n directly, so a system proxy never sees the secret.
+- **Slow tests on Windows:** the tests that simulate "n8n switched off" take about 2 seconds per attempt on Windows (the time Windows takes to report that nothing is listening). The total test run is under a minute.

@@ -1,0 +1,18 @@
+# Copy this file to ops-hub.toml and change the paths for your computer.
+# Never put the webhook secret here: set the environment variable OPS_HUB_WEBHOOK_SECRET instead.
+
+# Folder containing manifest-doctor's code (the folder with manifest_doctor/ inside it)
+manifest_doctor_path = "C:/path/to/manifest-doctor"
+
+# Where manifest-doctor writes its dated report folders
+reports_dir = "C:/path/to/DeliveryReports"
+
+# The n8n webhook (the production URL shown in n8n's Webhook node)
+webhook_url = "http://localhost:5678/webhook/delivery-check"
+
+# Where undeliverable messages wait until 'resend'
+outbox_dir = "C:/path/to/DeliveryReports/outbox"
+
+# Optional (defaults shown)
+# timeout_seconds = 10
+# max_error_chars = 500
