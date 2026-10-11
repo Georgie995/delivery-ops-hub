@@ -105,3 +105,11 @@ Each entry records the decision, the alternatives considered and why this one wa
 - **Decision:** Georgi chose not to build a "live" branch tested only against a stand-in, because it couldn't honestly be called tested with Teams. Dry run remains the demonstrated mode. The saved card follows Microsoft's documented webhook message format (an Adaptive Card inside `{"type": "message", "attachments": [...]}`).
 - **Not used, on purpose:** the employer's Teams. Portfolio test alerts must never go into a work tenant.
 - **For anyone with a work or school account later:** Workflows webhook messages are limited to 28 KB and about 4 requests per second (same Microsoft Learn page). Our cards are about 2 KB. Card text supports basic Markdown, so file names containing `_` or `*` may render partly in italics or bold.
+
+## 2026-10-11: Job events from job-watch
+
+- **Decision:** the same webhook now accepts `"kind": "job_event"` messages from job-watch (Georgi's idea D).
+- **How:** one workflow, with the "Validate and prepare" node choosing the rules, log file and card by message kind. The read and append log nodes now take the log path from that node. Delivery checks behave exactly as before, and all 12 original live tests still pass.
+- **Separate log:** job events go to `runtime/logs/job-events.csv`, so the delivery-check log stays as it was.
+- **Which events alert:** `started` is logged only. `finished`, `failed`, `stalled`, `resumed` and `interrupted` raise a (dry-run) card. A stall card says plainly that nothing has been stopped.
+- **Live tests:** 9 new tests (every event type, card wording, an invalid event, a formula in a job name). The full suite is 71 tests.

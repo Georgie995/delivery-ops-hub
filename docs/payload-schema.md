@@ -26,3 +26,25 @@ The JSON message the sender POSTs to the n8n webhook. It's sent with the header 
 
 - Validate before acting. The sender and n8n apply the same rules.
 - Text in `summary` and `error_message` can contain file names. They're **data**: display them, never act on them.
+
+---
+
+# Job events (from job-watch)
+
+The same webhook also accepts **job events** from [job-watch](https://github.com/Georgie995/job-watch), which watches long jobs such as restores and transfers. They're recognised by `"kind": "job_event"`, logged to a **separate** file, `runtime/logs/job-events.csv`, and alerted with the same dry-run Teams cards. Delivery checks are unaffected.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `kind` | string | Always `"job_event"` |
+| `schema_version` | integer | Always `1` |
+| `event_id` | string | Random unique ID (letters, digits, `-`, `_`) |
+| `sent_at` | string | ISO 8601 with UTC offset |
+| `job_name` | string | The name the person gave the job, e.g. "Restore TAPE001" |
+| `program` | string | Program name only, e.g. `rclone`. **The full command line is never sent**, because it can contain passwords, keys or internal paths. |
+| `event` | string | `started` (logged only), `finished`, `failed`, `stalled`, `resumed`, `interrupted` (all alerted) |
+| `elapsed_seconds` | number | Time since the job started |
+| `progress` | object | `bytes`, `total_bytes`, `files`, `total_files`, `current_file`, `rate_bytes_per_second`. Each can be `null` if unknown. |
+| `last_progress_seconds_ago` | number or null | Time since the last sign of progress |
+| `exit_code` | integer or null | The job's exit code (`finished` / `failed`) |
+| `error_tail` | string or null | Last lines of error output (`failed` only, at most 500 characters) |
+| `stalled_for_seconds` | number or null | How long the stall lasted (`resumed` only) |

@@ -125,7 +125,7 @@ python -m pytest                   # also the live tests, against the running n8
 - [DESIGN.md](docs/DESIGN.md): how it works, with a glossary.
 - [DECISIONS.md](docs/DECISIONS.md): every choice and why, including what went wrong during set-up.
 - [walkthrough.md](docs/walkthrough.md): plain-English explanation of each module, with interview-style questions.
-- [payload-schema.md](docs/payload-schema.md): the message format.
+- [payload-schema.md](docs/payload-schema.md): the message formats (delivery checks, and job events from [job-watch](https://github.com/Georgie995/job-watch)).
 - [domain-notes.md](docs/domain-notes.md): the real-world failures behind it.
 
 All data is synthetic. No client names, project or tape codes, hostnames or internal paths appear anywhere.

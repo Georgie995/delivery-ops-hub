@@ -1,0 +1,22 @@
+{
+  "kind": "job_event",
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "sent_at": "2026-10-11T18:32:05+01:00",
+  "job_name": "Restore TAPE001",
+  "program": "rsync",
+  "elapsed_seconds": 0,
+  "progress": {
+    "bytes": 0,
+    "total_bytes": null,
+    "files": 0,
+    "total_files": null,
+    "current_file": null,
+    "rate_bytes_per_second": null
+  },
+  "last_progress_seconds_ago": 40,
+  "exit_code": null,
+  "error_tail": null,
+  "stalled_for_seconds": null,
+  "event": "started"
+}

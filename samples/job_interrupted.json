@@ -1,0 +1,22 @@
+{
+  "kind": "job_event",
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "sent_at": "2026-10-11T18:32:05+01:00",
+  "job_name": "Restore TAPE001",
+  "program": "rsync",
+  "elapsed_seconds": 2520,
+  "progress": {
+    "bytes": 812400000000,
+    "total_bytes": null,
+    "files": 1204,
+    "total_files": null,
+    "current_file": "ShowA/Reel04/clip_0457.mov",
+    "rate_bytes_per_second": 410000000
+  },
+  "last_progress_seconds_ago": 40,
+  "exit_code": null,
+  "error_tail": null,
+  "stalled_for_seconds": null,
+  "event": "interrupted"
+}

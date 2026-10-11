@@ -1,0 +1,6 @@
+{
+  "kind": "job_event",
+  "schema_version": 1,
+  "event_id": "REPLACED-BY-TEST",
+  "event": "exploded"
+}
