@@ -4,8 +4,10 @@
 
 // ---- Settings (edit here) -------------------------------------------------------
 const SETTINGS = {
-  // 'dry_run': alerts are saved as files in /files/dry-run-alerts (runtime/dry-run-alerts on your PC).
-  // 'live':    alerts are posted to Teams (added in module 3).
+  // Only 'dry_run' is implemented: alerts are saved as files in /files/dry-run-alerts
+  // (runtime/dry-run-alerts on your PC). Posting to real Teams needs a work or school
+  // Microsoft 365 account with the Workflows app; personal Teams doesn't have it
+  // (checked 2026-10-11, see docs/DECISIONS.md).
   teams_mode: 'dry_run',
 };
 // ---------------------------------------------------------------------------------

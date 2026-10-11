@@ -98,3 +98,10 @@ Each entry records the decision, the alternatives considered and why this one wa
 - **Known limits:**
   - the workflow reads the whole log file on every message, just to see whether it exists;
   - Adaptive Card text supports a little formatting, so a file name containing `_` or `*` could appear partly in italics or bold in Teams (display only; to check in module 3).
+
+## 2026-10-11: Teams live posting not built; dry run is the demonstrated mode (module 3)
+
+- **Finding:** Georgi's personal Teams (desktop app, personal Microsoft account) shows Chat, Meet, Contacts, Copilot, Communities, Calendar and Activity, with no Apps entry and no Workflows app. Microsoft's instructions for creating a webhook with Workflows ("Send webhook alerts to a channel") are written for work or school teams and channels (Microsoft Learn, "Create an Incoming Webhook", updated 2026-08-03). Microsoft's page on Teams for personal use doesn't mention Workflows.
+- **Decision:** Georgi chose not to build a "live" branch tested only against a stand-in, because it couldn't honestly be called tested with Teams. Dry run remains the demonstrated mode. The saved card follows Microsoft's documented webhook message format (an Adaptive Card inside `{"type": "message", "attachments": [...]}`).
+- **Not used, on purpose:** the employer's Teams. Portfolio test alerts must never go into a work tenant.
+- **For anyone with a work or school account later:** Workflows webhook messages are limited to 28 KB and about 4 requests per second (same Microsoft Learn page). Our cards are about 2 KB. Card text supports basic Markdown, so file names containing `_` or `*` may render partly in italics or bold.

@@ -139,7 +139,7 @@ An alert that silently fails to send would repeat the F1 problem. So if every at
 | 7 | **Make dry-run alert file** → **Save dry-run alert** | Saves the Teams message exactly as it would be posted, to `/files/dry-run-alerts/teams-<event_id>.json`. |
 | 8 | **Reply: logged and alerted (200)**, or **Reply: logged, alert failed (502)** | If saving or posting the alert fails, the check is already logged, so the reply is 502 and the sender reports it loudly *without* retrying (a retry would log it twice). |
 
-Live Teams posting is added in module 3.
+**Live Teams posting was not built.** Personal Teams has no Workflows app, so it can't create the webhook (checked 2026-10-11). Dry run is the demonstrated mode: the saved card is exactly the message a Teams Workflows webhook accepts.
 
 - **The exported workflow file contains no secrets.** n8n keeps credentials separately and doesn't include them in exports. Before each export, a check script searches the file for anything that looks like a URL token or key.
 - **The Teams webhook address contains its own secret** (a signature in the address). How to store it so it never appears in the export is **checked during the build**: n8n 2.0 blocks reading environment variables inside Code nodes by default, so the options need testing. The rule is fixed: it never appears in the repo.
@@ -181,12 +181,12 @@ Outline only. The exact command is shown to you first, part by part.
 
 1. **Sender:** payload, settings, sending with retries, outbox and `resend`.
 2. **n8n set-up:** install via Docker (with approval), credentials, and the workflow built step by step in the n8n editor; export and the secret check.
-3. **Teams:** try a Workflows webhook in your personal Teams. If that's not possible, document dry-run as the demonstrated mode.
+3. **Teams:** tried. Personal Teams has no Workflows app, so dry run is the demonstrated mode (see DECISIONS.md).
 4. **Finish:** README (with the AI-assistance statement for approval), safety search, clean-copy test, publish when you say "go".
 
 ## 10. Known limits from the start
 
 - Single computer. n8n isn't reachable from outside, by design.
-- Whether personal Teams can create a Workflows webhook is unconfirmed (section 5). Dry run is the guaranteed fallback.
+- Alerts are demonstrated in **dry-run mode only**. Posting to real Teams needs a work or school Microsoft 365 account with the Workflows app.
 - Retries are deliberately simple (3 attempts). Long outages rely on the outbox and `resend`.
 - The sender depends on manifest-doctor's `report.json` format (documented in that repo's `docs/report-schema.md`).
