@@ -11,3 +11,5 @@ outbox/
 # secrets: never commit
 .env
 *.secret
+# local settings (paths on this PC)
+ops-hub.toml
