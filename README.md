@@ -1,5 +1,7 @@
 # delivery-ops-hub
 
+[![tests](https://github.com/Georgie995/delivery-ops-hub/actions/workflows/tests.yml/badge.svg)](https://github.com/Georgie995/delivery-ops-hub/actions/workflows/tests.yml) *Tests run on Linux and Windows after every change, and every Monday.*
+
 Makes sure the result of a delivery check **reaches a person**. Every check is logged; problems, and checks that couldn't run at all, raise an alert. An n8n workflow receives each result by webhook.
 
 Built on [manifest-doctor](https://github.com/Georgie995/manifest-doctor), which does the checking.

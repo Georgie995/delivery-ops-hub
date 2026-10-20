@@ -1,0 +1,38 @@
+# Runs the tests on GitHub's own Linux and Windows machines after every push, and every Monday
+# even if nothing was pushed (so a change in manifest-doctor or a new Python is noticed).
+# There is no n8n here, so the tests that need a running n8n skip themselves and say so.
+name: tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # The runner tests call the real manifest-doctor, so it's fetched next to this repo.
+      # "delivery-verify" is manifest-doctor's folder name on the author's PC, which the tests expect.
+      - uses: actions/checkout@v4
+        with:
+          path: delivery-ops-hub
+      - uses: actions/checkout@v4
+        with:
+          repository: Georgie995/manifest-doctor
+          path: delivery-verify
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest
+      - run: python -m pytest -q -rs
+        working-directory: delivery-ops-hub
